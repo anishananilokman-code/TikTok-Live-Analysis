@@ -1,34 +1,21 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-import os
 
 # =========================
 # PAGE CONFIG
 # =========================
 st.set_page_config(
-    page_title="Najeehah International - TikTok Live Analytics",
-    page_icon="📊",
+    page_title="Najeehah International - Business Performance",
+    page_icon="🛒",
     layout="wide"
 )
 
 # =========================
-# SIDEBAR
+# SIDEBAR FILE UPLOADER
 # =========================
 st.sidebar.title("Najeehah International")
-st.sidebar.subheader("TikTok Live Analytics Tool")
-
-page = st.sidebar.radio(
-    "Navigation",
-    [
-        "Executive Dashboard",
-        "Exploratory Data Analysis (EDA)",
-        "Purchase Behavior Analysis",  
-        "PLS-SEM Findings",
-        "Monitoring Tool"
-    ]
-)
+st.sidebar.subheader("Data Upload")
 
 uploaded_file = st.sidebar.file_uploader(
     "Upload Live Sessions Dataset",
@@ -42,256 +29,172 @@ if uploaded_file is not None:
     else:
         df = pd.read_csv(uploaded_file)
         
-  
     df.columns = df.columns.str.strip()
     
-    
+    # Dynamic column mapping (Fixed to prevent duplication errors)
     rename_dict = {}
     for col in df.columns:
         col_lower = col.lower()
-        if 'gross revenue' in col_lower or 'revenue' in col_lower:
+        
+        if 'gross' in col_lower or 'reve' in col_lower:
             rename_dict[col] = 'Gross Revenue'
-        elif 'product clicks' in col_lower or 'clicks' in col_lower:
+        elif 'product' in col_lower or 'cli' in col_lower:
             rename_dict[col] = 'Product Clicks'
-        elif 'avg' in col_lower and 'duration' in col_lower:
-            rename_dict[col] = 'Avg. View Duration'
         elif 'ctr' in col_lower:
             rename_dict[col] = 'Ctr'
         elif 'ctor' in col_lower:
             rename_dict[col] = 'Ctor'
-        elif 'like' in col_lower:
-            rename_dict[col] = 'Likes'
         elif 'comment' in col_lower:
             rename_dict[col] = 'Comments'
-        elif 'share' in col_lower:
-            rename_dict[col] = 'Shares'
         elif 'viewer' in col_lower:
             rename_dict[col] = 'Viewers'
+        elif 'like' in col_lower:
+            rename_dict[col] = 'Likes'
+        elif 'share' in col_lower:
+            rename_dict[col] = 'Shares'
+        elif 'date' in col_lower:
+            rename_dict[col] = 'Session Date'
+        elif 'time' in col_lower or 'pukul' in col_lower or 'start' in col_lower:
+            rename_dict[col] = 'Start Time'
+        elif 'avg' in col_lower or 'view d' in col_lower:
+            rename_dict[col] = 'Avg. View Duration'
+        elif 'duration' in col_lower or 'tempoh' in col_lower:
+            rename_dict[col] = 'Stream Duration'
             
     df = df.rename(columns=rename_dict)
     
-    numeric_cols = ['Gross Revenue', 'Product Clicks', 'Likes', 'Comments', 'Shares', 'Viewers', 'Ctr', 'Ctor', 'Avg. View Duration']
+    # Clean string data to numeric values for key metrics
+    numeric_cols = ['Gross Revenue', 'Product Clicks', 'Comments', 'Viewers', 'Ctr', 'Ctor', 'Avg. View Duration', 'Likes', 'Shares']
     for col in numeric_cols:
         if col in df.columns:
             df[col] = df[col].astype(str).str.replace(r'[^\d\.\-]', '', regex=True)
             df[col] = pd.to_numeric(df[col], errors='coerce')
             
     df = df.fillna(0)
+    
+    # Sort by date chronologically
+    if 'Session Date' in df.columns:
+        df['Session Date'] = df['Session Date'].astype(str)
+        df = df.sort_values(by='Session Date', ascending=True)
+    
+    # Generate unique X-axis label combining Date and Start Time
+    df['Session_Label'] = df['Session Date'] if 'Session Date' in df.columns else range(1, len(df) + 1)
+    if 'Start Time' in df.columns:
+        df['Session_Label'] = df['Session Date'] + " (" + df['Start Time'].astype(str) + ")"
 
     # ==================================
-    # EXECUTIVE DASHBOARD
+    # MAIN DISPLAY: BUSINESS PERFORMANCE
     # ==================================
-    if page == "Executive Dashboard":
-        st.title("📊 Executive Dashboard")
-        st.markdown("Overview of the January and February TikTok Live baseline performance records for Najeehah International.")
-        
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Likes", f"{df['Likes'].sum():,.0f}")
-        c2.metric("Total Comments", f"{df['Comments'].sum():,.0f}")
-        c3.metric("Total Shares", f"{df['Shares'].sum():,.0f}")
-        c4.metric("Total Viewers", f"{df['Viewers'].sum():,.0f}")
+    st.title("🛒 4.6.5 Business Performance Dashboard")
+    st.markdown("### How Viewer Behaviour Contributes to Business Outcomes")
+    st.markdown("This targeted interface monitors commercial performance and evaluates how viewer activities directly drive business results, bridging empirical data with the S-O-R framework.")
 
-        c5, c6, c7 = st.columns(3)
-        c5.metric("Gross Revenue (RM)", f"RM {df['Gross Revenue'].sum():,.2f}")
-        c6.metric("Average CTR", f"{df['Ctr'].mean():.4f}")
-        c7.metric("Average CTOR", f"{df['Ctor'].mean():.4f}")
+    st.divider()
 
-        st.divider()
+    # 1. KPI Cards Component
+    kp1, kp2, kp3, kp4, kp5 = st.columns(5)
+    kp1.metric("Total Gross Revenue", f"RM {df['Gross Revenue'].sum():,.2f}")
+    kp2.metric("Total Product Clicks", f"{df['Product Clicks'].sum():,.0f}")
+    kp3.metric("Average CTR", f"{df['Ctr'].mean():.4f}")
+    kp4.metric("Average CTOR", f"{df['Ctor'].mean():.4f}")
+    kp5.metric("Total Sessions Analyzed", f"{len(df)}")
 
-        behaviour = pd.DataFrame({
-            "Viewer Behaviour": ["Likes", "Comments", "Shares"],
-            "Total Frequency": [df["Likes"].sum(), df["Comments"].sum(), df["Shares"].sum()]
-        })
+    st.divider()
 
-        fig = px.bar(
-            behaviour,
-            x="Viewer Behaviour",
-            y="Total Frequency",
-            title="Distribution of Active and Passive Viewer Actions",
-            color="Viewer Behaviour",
-            text_auto='.2s'
+    # 2. S-O-R Framework Conversion Funnel
+    st.subheader("🎯 Empirical S-O-R Conversion Pipeline Funnel")
+    st.markdown("Visualization of user interaction flowing through psychological phases to generate monetary outcomes.")
+    
+    funnel_data = dict(
+        number=[df['Comments'].sum(), df['Viewers'].sum(), df['Product Clicks'].sum(), df['Gross Revenue'].sum()],
+        stage=["Stimulus: Comments (Count)", "Organism: Viewer Engagement (Viewers)", "Response: Product Clicks (Count)", "Outcome: Gross Revenue (RM)"]
+    )
+    fig_funnel = px.funnel(funnel_data, x='number', y='stage', color_discrete_sequence=['#FF4B4B'])
+    st.plotly_chart(fig_funnel, use_container_width=True)
+
+    st.divider()
+
+    # 3. INTERACTIVE REVENUE TREND & COMPARATIVE BEHAVIOR ANALYSIS
+    st.subheader("📈 Chronological Trend & Comparative Behavior Analysis")
+    st.markdown("Compare monetary yields alongside multiple dynamic behavioral metrics to observe co-movement patterns.")
+    
+    t1, t2 = st.columns([2, 3])
+    
+    with t1:
+        fig_line = px.line(
+            df, 
+            x="Session_Label", 
+            y="Gross Revenue", 
+            title="Baseline Business Outcome: Gross Revenue Trend", 
+            labels={"Session_Label": "Session Date & Start Time", "Gross Revenue": "Revenue (RM)"},
+            markers=True
         )
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ==================================
-    # EXPLORATORY DATA ANALYSIS (EDA)
-    # ==================================
-    elif page == "Exploratory Data Analysis (EDA)":
-        st.title("📈 Exploratory Data Analysis (EDA)")
-        st.markdown("Analysis of the distribution of main variables before structural modeling.")
-
-        tab_dist, tab_corr, tab_scatter = st.tabs(["📊 Data Distribution", "🧮 Correlation Matrix", "📉 Bivariate Scatter Plots"])
+        fig_line.update_traces(line_color='#FF4B4B')
+        st.plotly_chart(fig_line, use_container_width=True)
         
-        with tab_dist:
-            st.subheader("Data Distribution & Outlier Detection")
-            st.markdown("Select a variable to view distribution patterns (*skewness*) and outliers.")
-            
-            selected_col = st.selectbox("Select Variable:", numeric_cols)
-            
-            fig_dist = px.histogram(
-                df, x=selected_col, 
-                marginal="box", 
-                title=f"Frequency Distribution & Outlier Characteristics for {selected_col}",
-                color_discrete_sequence=['#FF4B4B']
+    with t2:
+        available_behaviors = ['Comments', 'Likes', 'Shares', 'Viewers', 'Product Clicks']
+        
+        selected_behaviors = st.multiselect(
+            "Select Viewer Behavior Metrics for Trend Comparison:",
+            options=available_behaviors,
+            default=['Comments', 'Product Clicks']
+        )
+        
+        if selected_behaviors:
+            fig_compare = px.line(
+                df,
+                x="Session_Label",
+                y=selected_behaviors,
+                title="Comparative Analysis: Dynamic Viewer Behavior Trends",
+                labels={"Session_Label": "Session Date & Start Time", "value": "Metric Count", "variable": "Behavior Metric"},
+                markers=True
             )
-            st.plotly_chart(fig_dist, use_container_width=True)
-            st.info(f"Note: If the histogram tails off to the right, this supports the Chapter 4 observation that {selected_col} is highly positively skewed (viral-driven data).")
-
-        with tab_corr:
-            st.subheader("Correlation Matrix (Heatmap)")
-            corr_matrix = df[['Likes', 'Comments', 'Shares', 'Viewers', 'Avg. View Duration', 'Product Clicks', 'Gross Revenue']].corr()
-            
-            fig_corr = px.imshow(
-                corr_matrix,
-                text_auto='.2f',
-                color_continuous_scale='RdBu_r',
-                title="Linear Correlation Matrix Between TikTok Live Variables"
-            )
-            st.plotly_chart(fig_corr, use_container_width=True)
-            st.success("Interpretation: Values approaching 1.00 indicate a strong linear relationship (e.g., Comments vs Viewers or Clicks vs Gross Revenue).")
-
-        with tab_scatter:
-            st.subheader("Bivariate Relational Scatter Plots")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                fig1 = px.scatter(df, x="Comments", y="Viewers", trendline="ols",
-                                  title="Comments vs Viewers (Strong Linear Algorithmic Push)")
-                st.plotly_chart(fig1, use_container_width=True)
-                
-                fig3 = px.scatter(df, x="Likes", y="Viewers", trendline="ols",
-                                  title="Likes vs Viewers (Weak/Passive Trend)")
-                st.plotly_chart(fig3, use_container_width=True)
-
-            with col2:
-                fig2 = px.scatter(df, x="Shares", y="Viewers", trendline="ols",
-                                  title="Shares vs Viewers (High Organic Traffic Flow)")
-                st.plotly_chart(fig2, use_container_width=True)
-                
-                if "Avg. View Duration" in df.columns:
-                    fig4 = px.scatter(df, x="Avg. View Duration", y="Viewers", trendline="ols",
-                                      title="Avg. View Duration vs Viewers (Scattered Distribution)")
-                    st.plotly_chart(fig4, use_container_width=True)
-
-    # ==================================
-    # PURCHASE BEHAVIOR ANALYSIS
-    # ==================================
-    elif page == "Purchase Behavior Analysis":
-        st.title("🛒 Purchase Behavior Analysis")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            fig = px.scatter(df, x="Product Clicks", y="Gross Revenue", trendline="ols",
-                             title="Product Clicks vs Gross Revenue")
-            st.plotly_chart(fig, use_container_width=True)
-            
-        with col2:
-            fig2 = px.scatter(df, x="Comments", y="Gross Revenue", trendline="ols",
-                              title="Comments vs Gross Revenue (Direct Monetary Link)")
-            st.plotly_chart(fig2, use_container_width=True)
-
-        st.subheader("Conversion Efficiency Benchmarks")
-        c1, c2 = st.columns(2)
-        c1.metric("Average CTR Across Sessions", f"{df['Ctr'].mean():.4f}")
-        c2.metric("Average CTOR Across Sessions", f"{df['Ctor'].mean():.4f}")
-
-    # ==================================
-    # PLS-SEM FINDINGS
-    # ==================================
-    elif page == "PLS-SEM Findings":
-        st.title("🔬 Empirical PLS-SEM Statistical Output")
-        st.markdown("Validated measurement and structural parameters matching Chapter 4 analysis.")
-
-        st.subheader("1. Measurement Model Evaluation (Outer Model)")
-        tab1, tab2 = st.columns(2)
-        with tab1:
-            st.markdown("**Formative Construct: Viewer Behaviour (Stimulus)**")
-            st.table(pd.DataFrame({
-                "Indicator": ["Comments", "Shares", "Likes"],
-                "Outer Weight": [0.955, 0.932, 0.684],
-                "VIF Status": ["4.120 (<5.0)", "3.754 (<5.0)", "1.850 (<5.0)"]
-            }))
-        with tab2:
-            st.markdown("**Reflective Constructs (Organism & Response)**")
-            st.table(pd.DataFrame({
-                "Construct": ["Engagement", "Engagement", "Purchase Behavior", "Purchase Behavior"],
-                "Indicator": ["Viewers", "Avg. View Duration", "Product Clicks", "Gross Revenue"],
-                "Outer Loading": [0.975, 0.297, 0.986, 0.985]
-            }))
-
-        st.subheader("2. Structural Model Diagram (S-O-R Framework)")
-        
-        image_path = "image_3379fa.png"
-        if os.path.exists(image_path):
-            st.image(image_path, caption="PLS-SEM Empirical Structural Model Mapping for Najeehah International", use_container_width=True)
+            st.plotly_chart(fig_compare, use_container_width=True)
         else:
-            st.warning(f"Sila pastikan fail imej '{image_path}' diletakkan di dalam folder projek yang sama untuk paparan visual rajah.")
+            st.warning("Please select at least one viewer behavior metric from the dropdown above to display the comparison trend.")
 
-        st.subheader("3. Core Structural Hypotheses Assessment")
-        st.info("📊 **Explanatory Power Summary:** R² Engagement is **79.9%**, while R² Purchase Behavior is **88.5%**.")
-        st.success("🎯 **Partial Mediation Confirmed:** Viewer Engagement significantly mediates the S-O-R pipeline (β = 0.405, p < 0.001). Comments act as the ultimate algorithmic trigger.")
+    st.divider()
 
-    # ==================================
-    # MONITORING TOOL (Objective 3)
-    # ==================================
-    elif page == "Monitoring Tool":
-        st.title("🎯 Data-Driven TikTok Live Monitoring Tool")
-        st.markdown("### Objective 3 Implementation: Real-Time Diagnostic Performance Tracker")
-        st.markdown("This tool utilizes the mathematically validated empirical weights from the outer model execution ($W_{comments}=0.955, W_{shares}=0.932, W_{likes}=0.684$) to evaluate stream status.")
+    # 4. Engagement vs Outcomes (Scatter Plots)
+    st.subheader("Bivariate Engagement vs Business Outcomes Analysis")
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        fig_sc1 = px.scatter(df, x="Comments", y="Gross Revenue", trendline="ols", title="Engagement vs Revenue (Comments vs Gross Revenue)")
+        st.plotly_chart(fig_sc1, use_container_width=True)
+        st.caption("Expected finding: Sessions with higher comment activity tend to generate higher gross revenue.")
+    with sc2:
+        fig_sc2 = px.scatter(df, x="Comments", y="Product Clicks", trendline="ols", title="Engagement vs Action (Comments vs Product Clicks)")
+        st.plotly_chart(fig_sc2, use_container_width=True)
+        st.caption("Expected finding: Higher levels of commenting behaviour are associated with increased product clicks.")
 
-        with st.form("session_tracker"):
-            st.markdown("##### Input Live Session Stream Metrics")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                in_comments = st.number_input("Current Comment Count", min_value=0, value=50, step=1)
-            with col2:
-                in_shares = st.number_input("Current Shares Count", min_value=0, value=10, step=1)
-            with col3:
-                in_likes = st.number_input("Current Likes Count", min_value=0, value=500, step=10)
-                
-            in_viewers = st.number_input("Current Concurrent Viewers Count", min_value=0, value=200, step=1)
-            
-            submit = st.form_submit_button(label="Run Real-Time Performance Diagnostic")
+    st.divider()
 
-        if submit:
-            empirical_score = (in_comments * 0.955) + (in_shares * 0.932) + (in_likes * 0.684)
-            
-            st.markdown("---")
-            st.subheader("📊 Diagnostic Output Report")
-            
-            c1, c2 = st.columns(2)
-            c1.metric("Validated Interaction Score", f"{empirical_score:,.2f}")
-            
-            predicted_purchase_index = (empirical_score * 0.513) + (in_viewers * 0.449)
-            c2.metric("Predicted Purchase Index", f"{predicted_purchase_index:,.2f}")
-
-            if empirical_score >= 800:
-                st.success("🟢 **HIGH ALGORITHMIC VELOCITY SESSION**")
-                st.markdown("""
-                **Operational Status & Immediate Strategic Directives:**
-                * **Algorithmic Trigger Status:** Stream is highly optimized. The TikTok recommendation engine is receiving dense interaction signals via high comment loads.
-                * **Host Action Needed:** Shift focus directly to the commercial funnel. Execute hard sales pushes, explicitly call out pinned items, and announce flash coupon deals.
-                * **Conversion Focus:** Direct current high volumes into immediate checkouts to maximize the active stream wave.
-                """)
-            elif empirical_score >= 250:
-                st.warning("🟡 **MODERATE ENGAGEMENT GRIDLOCK**")
-                st.markdown("""
-                **Operational Status & Immediate Strategic Directives:**
-                * **Algorithmic Trigger Status:** S-O-R pathway is under-stimulated. Interaction level is insufficient to push the stream aggressively onto the For You Page (FYP).
-                * **Host Action Needed:** Immediately pause general product explanations. Pivot to an interactive engagement block. 
-                * **Tactical Plays:** Ask direct, easy-to-answer questions to clear the comment bottleneck. Run a dedicated share-incentive target sequence to expand organic visibility.
-                """)
-            else:
-                st.error("🔴 **CRITICAL SYSTEM STAGNATION**")
-                st.markdown("""
-                **Operational Status & Immediate Strategic Directives:**
-                * **Algorithmic Trigger Status:** Low performance session. Passive consumption or drop-offs are occurring, severely suppressing structural reach metrics.
-                * **Host Action Needed:** Total operational reset. Deploy instant high-energy hooks, initiate an unexpected flash giveaway, or launch a mini-game.
-                * **Tactical Plays:** Explicitly mandate chat activities ("Drop a '1' in the chat if you hear me!") to force interaction data points back into the platform distribution pipeline.
-                """)
+    # 5. Top Performing Sessions Ranked Table
+    st.subheader("Top Performing Sessions (Benchmarking Dataset)")
+    
+    table_cols = []
+    table_names = []
+    
+    if 'Session Date' in df.columns:
+        table_cols.append('Session Date')
+        table_names.append('Date')
+    if 'Start Time' in df.columns:
+        table_cols.append('Start Time')
+        table_names.append('Start Time')
+    if 'Stream Duration' in df.columns:
+        table_cols.append('Stream Duration')
+        table_names.append('Duration')
+        
+    table_cols.extend(['Gross Revenue', 'Product Clicks', 'Comments'])
+    table_names.extend(['Revenue (RM)', 'Product Clicks', 'Comments'])
+    
+    top_sessions = df[table_cols].sort_values(by='Gross Revenue', ascending=False).head(10)
+    top_sessions.columns = table_names
+    
+    st.dataframe(top_sessions.style.format({'Revenue (RM)': 'RM {:,.2f}'}), use_container_width=True)
 
 else:
-    st.title("📊 Najeehah International - TikTok Live Analytics Dashboard")
+    st.title("📊 Najeehah International - TikTok Live Business Performance")
     st.markdown("---")
-    st.info("Please upload your TikTok Live session dataset (`.xlsx` or `.csv`) via the sidebar layout to initialize the interactive analytics dashboard.")
+    st.info("Please upload your TikTok Live session dataset (`.xlsx` or `.csv`) via the sidebar layout to display the performance dashboard.")
